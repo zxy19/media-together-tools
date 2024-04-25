@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>批量歌单</title>
+    <link rel="stylesheet" href="./bootstrap.min.css" />
+  </head>
+  <body>
+    <h1>批量歌单（网易云）</h1>
+    <p>
+      请在下方填入歌单名，一行一个。<br />可以使用<a
+        href="https://yyrcd.com/n2s/" target="_blank"
+        >https://yyrcd.com/n2s/</a
+      >进行导出
+    </p>
+    <textarea class="form-control" name="names" id="names"></textarea><br />
+    <button id="btn" class="btn btn-primary">1.抓取</button
+    ><button id="btn-stop" class="btn btn-danger">停止</button><br />
+    <table class="table">
+      <thead>
+        <tr>
+          <th>原名字</th>
+          <th>名字</th>
+          <th>URL</th>
+          <th>选择</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr>
+          没有数据
+        </tr>
+      </tbody>
+    </table>
+    <br />
+    <button id="btn2" class="btn btn-primary">2.添加</button>
+
+    <script src="jquery.3.5.1.min.js"></script>
+    <script src="bootstrap.min.js"></script>
+    <script>
+      var isGetting = false;
+      const btn = document.getElementById("btn");
+      const btn2 = document.getElementById("btn2");
+      const names = document.getElementById("names");
+      const tbody = document.getElementById("tbody");
+      const btnStop = document.getElementById("btn-stop");
+
+      function wait(time) {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve();
+          }, time);
+        });
+      }
+      btnStop.addEventListener("click", () => {
+        isGetting = false;
+      });
+      btn.addEventListener("click", async () => {
+        if (isGetting) {
+          return;
+        }
+        isGetting = true;
+        tbody.innerHTML = "";
+        const namesArr = names.value.split("\n");
+        for (const name of namesArr) {
+          if (!name) continue;
+          if (/^\s*$/.test(name)) continue;
+          const res = await fetch("neteasyMusic.php?word=" + name + "&n=1");
+          const text = await res.text();
+          const jsonTxt =
+            /window\.opener\.postMessage\(([\w\W]*\})\,\"\*\"\)\;/.exec(text);
+          if (jsonTxt) {
+            const json = eval("(" + jsonTxt[1] + ")");
+            let elem = document.createElement("tr");
+            elem.setAttribute("data-url", json.url);
+            elem.setAttribute("data-name", name);
+            elem.className = "url-item";
+            elem.innerHTML = `
+              <td>${name}</td>
+              <td>${json.name}</td>
+              <td><a href="${json.url}">点击跳转</a></td>
+              <td><input type="checkbox" class="form-check-input" checked name="urls"></td>
+            `;
+            tbody.appendChild(elem);
+          } else {
+            let elem = document.createElement("tr");
+            elem.innerHTML = `
+              <td>${name}</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+            `;
+            tbody.appendChild(elem);
+          }
+          await wait(1000);
+          if (!isGetting) break;
+        }
+        isGetting = false;
+      });
+
+      btn2.addEventListener("click", async () => {
+        if (isGetting) {
+          return;
+        }
+        isGetting = true;
+        const inputs = document.getElementsByClassName("form-check-input");
+        for (const input of inputs) {
+          if (input.checked) {
+            const url = input.parentNode.parentNode.getAttribute("data-url");
+            const name = input.parentNode.parentNode.getAttribute("data-name");
+            window.opener.postMessage(
+              {
+                type: "setForm",
+                name: name,
+                url: url,
+                mediaType: "audio",
+              },
+              "*"
+            );
+            await wait(500);
+            window.opener.postMessage({
+              type: "submit",
+            }, "*");
+            await wait(500);
+          }
+        }
+        isGetting = false;
+      });
+    </script>
+  </body>
+</html>
